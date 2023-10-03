@@ -1,0 +1,31 @@
+{
+  "name": "themehybrid/hybrid-assets",
+  "description": "Assets helper package for the Hybrid Core framework.",
+  "license": "GPL-2.0-or-later",
+  "type": "library",
+  "keywords": [
+    "wordpress"
+  ],
+  "authors": [
+    {
+      "name": "Theme Hybrid",
+      "email": "themehybrid@gmail.com",
+      "homepage": "https://themehybrid.com",
+      "role": "Developer"
+    }
+  ],
+  "homepage": "https://github.com/themehybrid/hybrid-assets",
+  "support": {
+    "issues": "https://github.com/themehybrid/hybrid-assets/issues"
+  },
+  "require": {
+    "php": ">=8.0"
+  },
+  "minimum-stability": "dev",
+  "prefer-stable": true,
+  "autoload": {
+    "psr-4": {
+      "Hybrid\\Assets\\": "src/"
+    }
+  }
+}
