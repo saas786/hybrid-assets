@@ -27,5 +27,8 @@
     "psr-4": {
       "Hybrid\\Assets\\": "src/"
     }
+  },
+  "config": {
+    "sort-packages": true
   }
 }
