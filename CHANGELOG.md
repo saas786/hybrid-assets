@@ -2,6 +2,12 @@
 
 You can see the changes made via the [commit log](https://github.com/themehybrid/hybrid-assets/commits/master) for the latest release.
 
+## [1.0.0-alpha.3] - 2024-11-29
+
+### Changed
+
+- Add $inherit parameter to handle child theme asset fallback in ParentTheme class
+
 ## [1.0.0-alpha.2] - 2024-08-02
 
 ### Changed
