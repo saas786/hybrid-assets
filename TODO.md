@@ -1,0 +1,1 @@
+- [ ] Add parameter to bypass manifest lookup for assets that cannot use hashed paths (e.g. *.asset.php includes)
