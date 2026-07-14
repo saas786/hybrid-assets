@@ -7,7 +7,7 @@ use Hybrid\Core\ServiceProvider;
 /**
  * Assets provider class.
  */
-class Provider extends ServiceProvider {
+class AssetsServiceProvider extends ServiceProvider {
 
     /**
      * Register.
