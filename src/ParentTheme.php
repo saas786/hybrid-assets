@@ -1,48 +1,50 @@
 <?php
+
 /**
- * Class for handling assets for the parent theme.
+ * Asset resolver for the parent theme.
  */
 
 namespace Hybrid\Assets;
 
 use Hybrid\Assets\Contracts\AssetsAbstract;
 
-/**
- * Class ParentTheme
- * Handles assets for the parent theme.
- */
 class ParentTheme extends AssetsAbstract {
+    /**
+     * Container binding keys checked, in order, when resolving with
+     * `$inherit = true`. A parent theme only ever falls back to its child.
+     *
+     * @var array<int, class-string<AssetsAbstract>>
+     */
+    protected array $inheritance = [
+        ChildTheme::class,
+    ];
 
     /**
-     * Get the filesystem path for a file within the parent theme.
-     *
-     * @param string $file File path within the parent theme.
-     * @param bool   $inherit Whether to check for the file in the child theme first.
-     *                        Set to `true` to check the child theme first, `false` to use the parent theme only.
-     * @return string Absolute filesystem path of the file.
+     * Always true — WordPress can't run without a parent theme active.
      */
-    public function path( $file = '', $inherit = false ): string {
-        if ( $inherit ) {
-            return get_theme_file_path( $file );
-        }
+    public function exists(): bool {
+        return true;
+    }
 
+    /**
+     * Get the filesystem path for a file in the parent theme.
+     *
+     * @param string $file Relative file path.
+     *
+     * @return string Absolute path.
+     */
+    public function path( string $file = '' ): string {
         return get_parent_theme_file_path( $file );
     }
 
     /**
-     * Get the URL for a file within the parent theme.
+     * Get the URL for a file in the parent theme.
      *
-     * @param string $file File path within the parent theme.
-     * @param bool   $inherit Whether to check for the file in the child theme first.
-     *                         Set to `true` to check the child theme first, `false` to use the parent theme only.
-     * @return string URL of the file.
+     * @param string $file Relative file path.
+     *
+     * @return string File URL.
      */
-    public function url( $file = '', $inherit = false ): string {
-        if ( $inherit ) {
-            return get_theme_file_uri( $file );
-        }
-
+    public function url( string $file = '' ): string {
         return get_parent_theme_file_uri( $file );
     }
-
 }

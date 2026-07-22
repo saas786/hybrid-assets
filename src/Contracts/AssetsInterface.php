@@ -1,30 +1,27 @@
 <?php
+
 /**
- * Interface for handling assets - path and URL.
+ * Contract for resolving asset paths and URLs.
  */
 
 namespace Hybrid\Assets\Contracts;
 
-/**
- * Interface AssetsInterface
- * Describes methods for handling assets - path and URL.
- */
 interface AssetsInterface {
-
     /**
      * Get the absolute filesystem path of a file.
      *
-     * @param string $file File path within the assets.
-     * @return string Absolute filesystem path of the file.
+     * @param string $file Relative file path.
+     *
+     * @return string Absolute filesystem path.
      */
     public function path( string $file ): string;
 
     /**
-     * Get the URL for a file.
+     * Get the public URL of a file.
      *
-     * @param string $file File path within the assets.
-     * @return string URL of the file.
+     * @param string $file Relative file path.
+     *
+     * @return string Public URL of the file.
      */
     public function url( string $file ): string;
-
 }

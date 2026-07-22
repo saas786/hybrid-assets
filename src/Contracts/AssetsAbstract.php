@@ -1,15 +1,18 @@
 <?php
+
 /**
- * Abstract class implementing AssetsInterface with common functionality for handling assets.
+ * Base implementation of AssetsInterface — manifest resolution, versioning, path prep.
  */
 
 namespace Hybrid\Assets\Contracts;
 
-/**
- * Class AssetsAbstract
- * Abstract class implementing AssetsInterface with common functionality for handling assets.
- */
+use Hybrid\Assets\Asset;
+use Hybrid\Assets\Plugin;
+use function Hybrid\app;
+
 abstract class AssetsAbstract implements AssetsInterface {
+
+    use AssetMetaData;
 
     /**
      * Assets directory path.
@@ -17,172 +20,152 @@ abstract class AssetsAbstract implements AssetsInterface {
     protected string $assetsDirectory = '/public';
 
     /**
-     * The manifest directory path.
-     */
-    protected ?string $manifestDirectory = null;
-
-    /**
-     * The custom manifest directory path which can be provided directly to the assetUrl() and assertPath() methods.
-     */
-    protected ?string $customManifestDirectory = null;
-
-    /**
-     * Name of the manifest file.
-     */
-    protected string $manifestName = 'mix-manifest.json';
-
-    /**
-     * The loaded manifest array.
-     *
-     * @var array|null
-     */
-    protected ?array $manifest = null;
-
-    /**
      * Get the asset URL for a file.
      *
-     * This method constructs the URL for a given asset file using the provided file path and manifest directory.
-     * If a custom manifest directory is provided, it's used temporarily for this request.
-     *
-     * @param string $file The file path within the assets directory.
-     * @param string $manifestDirectory (optional) Custom manifest directory path.
-     * @return string URL of the asset file.
+     * @param string $file Relative file path within the assets directory.
+     * @param bool   $inherit Check child theme first, where applicable.
      */
-    public function assetUrl( string $file, string $manifestDirectory = '' ): string {
-        // Set a custom manifest path for this request only, if provided.
-        if ( $manifestDirectory ) {
-            $this->customManifestDirectory = $manifestDirectory;
-        }
-
-        // Get the URL of the prepared asset.
-        $url = $this->url( $this->prepareAsset( $file ) );
-
-        // Reset custom manifest path for subsequent requests, to avoid unintended behavior.
-        $this->customManifestDirectory = null;
-
-        return $url;
+    public function assetUrl( string $file, bool $inherit = false ): string {
+        return $this->asset( $file, $inherit )->url();
     }
 
     /**
      * Get the absolute filesystem path for a file within the assets directory.
      *
-     * This method constructs the absolute filesystem path for a given asset file using the provided file path
-     * and manifest directory. If a custom manifest directory is provided, it's used temporarily for this request.
-     *
-     * @param string $file The file path within the assets directory.
-     * @param string $manifestDirectory (optional) Custom manifest directory path.
-     * @return string Absolute filesystem path of the asset file.
+     * @param string $file Relative file path within the assets directory.
+     * @param bool   $inherit Check child theme first, where applicable.
      */
-    public function assetPath( string $file, string $manifestDirectory = '' ): string {
-        // Set a custom manifest path for this request only, if provided.
-        if ( $manifestDirectory ) {
-            $this->customManifestDirectory = $manifestDirectory;
-        }
-
-        // Get the absolute filesystem path of the prepared asset.
-        $path = $this->path( $this->prepareAsset( $file ) );
-
-        // Reset custom manifest path for subsequent requests, to avoid unintended behavior.
-        $this->customManifestDirectory = null;
-
-        return $path;
+    public function assetPath( string $file, bool $inherit = false ): string {
+        return $this->asset( $file, $inherit )->path();
     }
 
     /**
-     * Prepare an asset file for usage, considering the manifest.
+     * Resolve a fully-described `Asset` instance for a file.
      *
-     * @param string $file File path within the assets.
-     * @return string Prepared asset file path.
+     * @param string $file Relative file path, e.g. `js/admin/tabs.js`.
+     * @param bool   $inherit Whether to check the inheritance chain (e.g. child theme) first.
      */
-    public function prepareAsset( $file ) {
-        if ( ! str_starts_with( $file, '/' ) ) {
-            $file = "/{$file}";
+    public function asset( string $file, bool $inherit = false, string $manifestDirectory = '' ): Asset {
+        $file = $this->normalizeFile( $file );
+
+        if ( $inherit ) {
+            // Plugins are looked up under their override directory in the theme(s);
+            // themes are looked up under their own assets directory as-is.
+            $lookupFile = $this instanceof Plugin
+                ? $this->prependOverrideAssetsDirectory( $file )
+                : $this->prependAssetsDir( $file );
+
+            foreach ( $this->inheritanceChain() as $resolver ) {
+                if ( $resolver->exists() && is_readable( $resolver->path( $lookupFile ) ) ) {
+                    return $resolver->resolve( $lookupFile, $manifestDirectory );
+                }
+            }
         }
 
-        $manifest = $this->getManifest();
+        return $this->resolve( $this->prependAssetsDir( $file ), $manifestDirectory );
+    }
 
-        // Gets the path from the manifest.
-        if ( $manifest && isset( $manifest[ $file ] ) ) {
-            $file = $manifest[ $file ];
+    /**
+     * Prepend this resolver's override assets directory to a file path, for use
+     * when looking the file up in *other* resolvers (the inheritance chain).
+     */
+    protected function prependOverrideAssetsDirectory( string $file ): string {
+        $overrideAssetsDirectory = trim( $this->overrideAssetsDirectory(), '/' );
+
+        return '' === $overrideAssetsDirectory ? $file : $overrideAssetsDirectory . $file;
+    }
+
+    /**
+     * Directory name used by other resolvers when overriding this resolver's assets
+     * (currently only meaningful for `Plugin`). When non-empty, inheritance
+     * lookups prefix the requested file with this value, so a theme can host
+     * overrides for several plugins side by side, e.g.
+     * `{theme}/public/{override-assets-directory}/js/tabs.js`.
+     *
+     * Only applies when *this* resolver looks outward into its inheritance
+     * chain — resolving a file against this resolver's own files never uses it.
+     */
+    public function overrideAssetsDirectory(): string {
+        return '';
+    }
+
+    /**
+     * Resolve this resolver's inheritance chain to actual `AssetsAbstract` instances,
+     * silently skipping any binding that isn't registered or fails to resolve.
+     *
+     * @return array<int, \Hybrid\Assets\Contracts\AssetsAbstract>
+     */
+    protected function inheritanceChain(): array {
+        $app   = app();
+        $chain = [];
+
+        foreach ( $this->inheritance as $binding ) {
+            if ( ! $app || ! $app->bound( $binding ) ) {
+                continue;
+            }
+
+            try {
+                $resolved = $app->make( $binding );
+            } catch ( \Throwable ) {
+                // Skip bindings that fail to resolve rather than breaking asset lookup.
+                continue;
+            }
+
+            if ( $resolved instanceof self ) {
+                $chain[] = $resolved;
+            }
         }
 
+        return $chain;
+    }
+
+    /**
+     * Resolve an `Asset` against this resolver specifically, without consulting
+     * the inheritance chain. Metadata is looked up via `.asset.php`, then
+     * the Mix manifest, then a filemtime-based hash fallback.
+     *
+     * @param string $file Relative file path to look up, e.g. `public/js/tabs.js`.
+     */
+    public function resolve( string $file, string $manifestDirectory = '' ): Asset {
+        if ( $manifestDirectory ) {
+            $this->manifestDirectoryOverride = $manifestDirectory;
+        }
+
+        $asset = new Asset(
+            assetResolver: $this,
+            file: $file,
+            absolutePath: $this->path( $file )
+        );
+
+        $this->manifestDirectoryOverride = null;
+
+        return $asset;
+    }
+
+    /**
+     * Prepend the assets directory to a file path.
+     *
+     * @param string $file Relative file path within the assets.
+     */
+    protected function prependAssetsDir( string $file ): string {
         return $this->assetsDirectory . $file;
     }
 
     /**
-     * Get the current package manifest.
+     * Ensure a file path starts with a leading slash.
      *
-     * @return array
+     * @param string $file Relative file path.
      */
-    protected function getManifest(): array {
-        if ( ! is_null( $this->manifest ) ) {
-            return $this->manifest;
-        }
-
-        $manifestPath = $this->prepareManifestPath();
-
-        if ( ! is_file( $manifestPath ) ) {
-            return [];
-        }
-
-        $this->manifest = json_decode( (string) file_get_contents( $manifestPath ), true ) ?? [];
-
-        return $this->manifest;
-    }
-
-    /**
-     * Returns the file path to the `mix-manifest.json` file.
-     */
-    protected function prepareManifestPath(): string {
-        return $this->path( $this->prepareManifestDirectory() . '/' . $this->manifestName );
-    }
-
-    /**
-     * Prepare manifest directory, considering the manifest directory property.
-     *
-     * @return string Prepared manifest directory path.
-     */
-    protected function prepareManifestDirectory() {
-        // If custom manifest directory is provided just for this asset,
-        // use it, otherwise fallback to class property.
-        $manifestDirectory = $this->customManifestDirectory ?: $this->manifestDirectory;
-
-        // If either is missing, use assets directory, as it is the default directory,
-        // for `mix-manifest.json` file.
-        $manifestDirectory = $manifestDirectory ?: $this->assetsDirectory;
-
-        if ( $manifestDirectory && ! str_starts_with( $manifestDirectory, '/' ) ) {
-            $manifestDirectory = "/{$manifestDirectory}";
-        }
-
-        return $manifestDirectory;
+    protected function normalizeFile( string $file ): string {
+        return str_starts_with( $file, '/' ) ? $file : "/{$file}";
     }
 
     /**
      * Set the assets directory path.
      *
-     * @param $assetsDirectory string Assets directory path.
+     * @param string $assetsDirectory Assets directory path.
      */
-    public function setAssetsDirectory( $assetsDirectory ): void {
-        $this->assetsDirectory = $assetsDirectory;
+    public function setAssetsDirectory( string $assetsDirectory ): void {
+        $this->assetsDirectory = rtrim( $assetsDirectory, '/' );
     }
-
-    /**
-     * Set the custom manifest name.
-     *
-     * @param $manifestName string
-     */
-    public function setManifestName( $manifestName ): void {
-        $this->manifestName = $manifestName;
-    }
-
-    /**
-     * Set the manifest directory path.
-     *
-     * @param $manifestDirectory string Manifest directory path.
-     */
-    public function setManifestDirectory( $manifestDirectory ): void {
-        $this->manifestDirectory = $manifestDirectory;
-    }
-
 }
