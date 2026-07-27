@@ -168,4 +168,11 @@ abstract class AssetsAbstract implements AssetsInterface {
     public function setAssetsDirectory( string $assetsDirectory ): void {
         $this->assetsDirectory = rtrim( $assetsDirectory, '/' );
     }
+
+    /**
+     * Get the assets directory path.
+     */
+    public function getAssetsDirectory(): ?string {
+        return $this->assetsDirectory;
+    }
 }
