@@ -40,14 +40,19 @@ final class Asset {
     }
 
     /**
-     * Get the asset's script/style dependencies, as declared in its
-     * `.asset.php` meta data file. Always empty for Mix-built assets, since
-     * `mix-manifest.json` doesn't record dependencies.
+     * Get the asset's script/style dependencies.
+     *
+     * For WordPress-style assets (those with a `.asset.php` meta file), returns
+     * the dependencies declared in that file. For Laravel Mix assets (using
+     * `mix-manifest.json`), returns an empty array as Mix manifests do not
+     * track dependency information.
+     *
+     * @param array<int, string> $additional Additional dependency handles to merge in.
      *
      * @return array<int, string> Handles of the asset's dependencies.
      */
-    public function dependencies(): array {
-        return $this->getMetaData()['dependencies'];
+    public function dependencies( array $additional = [] ): array {
+        return array_unique( array_merge( $this->getMetaData()['dependencies'], $additional ) );
     }
 
     /**
