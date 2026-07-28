@@ -19,12 +19,10 @@ final class Asset {
     /**
      * @param \Hybrid\Assets\Contracts\AssetsAbstract $assetResolver Theme or plugin this asset belongs to.
      * @param string                                  $file Relative file path within the assets directory.
-     * @param string                                  $absolutePath Absolute filesystem path to the asset file.
      */
     public function __construct(
         protected AssetsAbstract $assetResolver,
-        protected string $file,
-        protected string $absolutePath
+        protected string $file
     ) {}
 
     /**
@@ -84,10 +82,18 @@ final class Asset {
      * @return string|null 20-character MD5 prefix, or null if the file doesn't exist.
      */
     private function getHash(): ?string {
-        if ( ! is_file( $this->absolutePath ) ) {
+        $absolutePath = $this->path( $this->file );
+
+        if ( ! is_file( $absolutePath ) || ! is_readable( $absolutePath ) ) {
             return null;
         }
 
-        return substr( md5_file( $this->absolutePath ), 0, 20 );
+        $hash = md5_file( $absolutePath );
+
+        if ( false === $hash ) {
+            return null;
+        }
+
+        return substr( $hash, 0, 20 );
     }
 }

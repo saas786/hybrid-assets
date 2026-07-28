@@ -133,8 +133,7 @@ abstract class AssetsAbstract implements AssetsInterface {
 
         $asset = new Asset(
             assetResolver: $this,
-            file: $file,
-            absolutePath: $this->path( $file )
+            file: $file
         );
 
         $this->manifestDirectoryOverride = null;
