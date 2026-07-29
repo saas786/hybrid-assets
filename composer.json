@@ -19,7 +19,9 @@
     "issues": "https://github.com/themehybrid/hybrid-assets/issues"
   },
   "require": {
-    "php": ">=8.2"
+    "php": ">=8.2",
+    "themehybrid/hybrid-core": "^7.0",
+    "themehybrid/hybrid-tools": "^2.0"
   },
   "minimum-stability": "dev",
   "prefer-stable": true,

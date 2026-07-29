@@ -6,14 +6,12 @@
 
 namespace Hybrid\Assets;
 
-use Hybrid\Assets\Contracts\AssetsAbstract;
-
-class ParentTheme extends AssetsAbstract {
+class ParentTheme extends AssetsResolver {
     /**
      * Container binding keys checked, in order, when resolving with
      * `$inherit = true`. A parent theme only ever falls back to its child.
      *
-     * @var array<int, class-string<AssetsAbstract>>
+     * @var array<int, class-string<\Hybrid\Assets\Contracts\AssetsResolver>>
      */
     protected array $inheritance = [
         ChildTheme::class,

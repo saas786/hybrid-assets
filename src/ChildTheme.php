@@ -6,11 +6,10 @@
 
 namespace Hybrid\Assets;
 
-use Hybrid\Assets\Contracts\AssetsAbstract;
 use function Hybrid\Tools\WordPress\get_child_theme_file_path;
 use function Hybrid\Tools\WordPress\get_child_theme_file_uri;
 
-class ChildTheme extends AssetsAbstract {
+class ChildTheme extends AssetsResolver {
     /**
      * Whether a child theme is actually active.
      */
