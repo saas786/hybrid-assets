@@ -23,6 +23,12 @@
     "themehybrid/hybrid-core": "^7.0",
     "themehybrid/hybrid-tools": "^2.0"
   },
+  "require-dev": {
+    "brain/monkey": "^2.6",
+    "mockery/mockery": "^1.6",
+    "pestphp/pest": "^3.7",
+    "pestphp/pest-plugin-mutate": "^3.0"
+  },
   "minimum-stability": "dev",
   "prefer-stable": true,
   "autoload": {
@@ -30,7 +36,20 @@
       "Hybrid\\Assets\\": "src/"
     }
   },
+  "autoload-dev": {
+    "psr-4": {
+      "Hybrid\\Assets\\Tests\\": "tests/"
+    }
+  },
   "config": {
+    "allow-plugins": {
+      "pestphp/pest-plugin": true,
+      "pestphp/pest-plugin-mutate": true
+    },
     "sort-packages": true
+  },
+  "scripts": {
+    "test": "pest",
+    "test:mutate": "pest --mutate --parallel"
   }
 }
