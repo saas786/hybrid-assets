@@ -16,7 +16,8 @@ WordPress asset registration usually means hardcoding URLs, manually tracking `f
 ## Requirements
 
 - PHP 8.2+
-- Hybrid Core framework v7+
+- [Hybrid Core](https://github.com/themehybrid/hybrid-core) framework ^7.0
+- [Hybrid Tools](https://github.com/themehybrid/hybrid-tools) ^2.0
 - WordPress 7.0+
 
 ## Installation
@@ -208,17 +209,28 @@ asset( $file, inherit: true )
               └─ version()      → .asset.php → mix-manifest.json → md5_file() hash
 ```
 
+## Exceptions
+
+All exceptions implement `Hybrid\Assets\Contracts\AssetsException`, so you can catch the whole package with one type if needed.
+
+| Exception | Thrown when |
+|---|---|
+| `InvalidAssetFileException` | `asset()` / `resolve()` is called with a blank file path |
+| `PluginFileNotSetException` | A `Plugin` resolver is used before `setPluginFile()` |
+| `PathOutsideBaseException` | A resolved `.asset.php` path escapes the resolver's base directory (traversal guard) |
+| `UnresolvableBaseDirectoryException` | The resolver's base directory can't be resolved via `realpath()` |
+
 ## Architecture
 
 | Class | Role |
 |---|---|
-| `AssetsInterface` | Contract: `path( $file )`, `url( $file )` |
-| `AssetsAbstract` | Shared resolution logic (inheritance chain, manifest handling) — implemented by all three resolvers below |
+| `Contracts\AssetsResolver` | Contract: `path()`, `url()`, `asset()`, `assetUrl()`, `assetPath()`, directory getters |
+| `AssetsResolver` (abstract) | Shared resolution logic (directories, inheritance chain, normalization) — extended by all three resolvers below |
 | `ParentTheme` | Resolves assets in the active parent theme |
 | `ChildTheme` | Resolves assets in the active child theme, if one exists |
 | `Plugin` | Resolves assets in a specific plugin; supports override directories |
 | `Asset` | Immutable, fully-resolved asset (URL, path, dependencies, version) |
-| `AssetMetaData` | Trait: reads `.asset.php` / `mix-manifest.json` metadata |
+| `Concerns\AssetMetaData` | Trait: reads `.asset.php` / `mix-manifest.json` metadata, path-traversal safe |
 | `AssetsServiceProvider` | Registers the above with the Hybrid Core container |
 
 ## License
