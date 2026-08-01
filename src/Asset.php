@@ -6,50 +6,56 @@
 
 namespace Hybrid\Assets;
 
-use Hybrid\Assets\Contracts\AssetsAbstract;
+use Hybrid\Assets\Concerns\AssetMetaData;
+use Hybrid\Assets\Contracts\Asset as AssetContract;
+use Hybrid\Assets\Contracts\AssetsResolver;
 
-final class Asset {
-    /**
-     * Cached meta data (dependencies + version), loaded on first access.
-     *
-     * @var array{dependencies: array<int, string>, version: string|null}|null
-     */
-    private ?array $metaData = null;
+final class Asset implements AssetContract {
+
+    use AssetMetaData;
 
     /**
-     * @param \Hybrid\Assets\Contracts\AssetsAbstract $assetResolver Theme or plugin this asset belongs to.
+     * @param \Hybrid\Assets\Contracts\AssetsResolver $assetResolver Theme or plugin this asset belongs to.
      * @param string                                  $file Relative file path within the assets directory.
-     * @param string                                  $absolutePath Absolute filesystem path to the asset file.
      */
     public function __construct(
-        protected AssetsAbstract $assetResolver,
+        protected AssetsResolver $assetResolver,
         protected string $file,
-        protected string $absolutePath
+        protected string $manifestDirectory
     ) {}
+
+    public function file(): string {
+        return $this->file;
+    }
 
     /**
      * Get the public URL of the asset.
      */
     public function url(): string {
-        return $this->assetResolver->url( $this->file );
+        return $this->assetResolver->url( $this->file() );
     }
 
     /**
      * Get the absolute filesystem path of the asset.
      */
     public function path(): string {
-        return $this->assetResolver->path( $this->file );
+        return $this->assetResolver->path( $this->file() );
     }
 
     /**
-     * Get the asset's script/style dependencies, as declared in its
-     * `.asset.php` meta data file. Always empty for Mix-built assets, since
-     * `mix-manifest.json` doesn't record dependencies.
+     * Get the asset's script/style dependencies.
+     *
+     * For WordPress-style assets (those with a `.asset.php` meta file), returns
+     * the dependencies declared in that file. For Laravel Mix assets (using
+     * `mix-manifest.json`), returns an empty array as Mix manifests do not
+     * track dependency information.
+     *
+     * @param array<int, string> $additional Additional dependency handles to merge in.
      *
      * @return array<int, string> Handles of the asset's dependencies.
      */
-    public function dependencies(): array {
-        return $this->getMetaData()['dependencies'];
+    public function dependencies( array $additional = [] ): array {
+        return array_values( array_unique( array_merge( $this->getMetaData()['dependencies'], $additional ) ) );
     }
 
     /**
@@ -66,28 +72,24 @@ final class Asset {
     }
 
     /**
-     * Resolve and memoize this asset's meta data.
-     *
-     * @return array{dependencies: array<int, string>, version: string|null}
-     */
-    private function getMetaData(): array {
-        return $this->metaData ??= $this->assetResolver->resolveAssetData( $this->file ) ?? [
-            'dependencies' => [],
-            'version'      => null,
-        ];
-    }
-
-    /**
      * Compute a short content hash for cache-busting when no manifest or
      * `.asset.php` version is available.
      *
      * @return string|null 20-character MD5 prefix, or null if the file doesn't exist.
      */
     private function getHash(): ?string {
-        if ( ! is_file( $this->absolutePath ) ) {
+        $absolutePath = $this->path();
+
+        if ( ! is_file( $absolutePath ) || ! is_readable( $absolutePath ) ) {
             return null;
         }
 
-        return substr( md5_file( $this->absolutePath ), 0, 20 );
+        $hash = md5_file( $absolutePath );
+
+        if ( false === $hash ) {
+            return null;
+        }
+
+        return substr( $hash, 0, 20 );
     }
 }
