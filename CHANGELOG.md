@@ -2,6 +2,47 @@
 
 You can see the changes made via the [commit log](https://github.com/themehybrid/hybrid-assets/commits/master) for the latest release.
 
+## [1.0.0-alpha.6] - 2026-08-02
+
+Adds inline SVG rendering. No breaking changes to existing APIs.
+
+### Added
+
+- `AssetsResolver::svg()` and `Contracts\Svg` — resolves an SVG through the
+  same path and inheritance chain as `asset()`, then renders it inline via
+  `render()` or `display()` ([#4])
+- `Support\SvgSanitizer` — sanitization is on by default; opt out per call
+  with `->sanitize( false )` when the file is known-trusted
+- SVG markup is filtered through an allow-list vendored from WordPress core's
+  `WP_Icons_Registry::sanitize_inline_svg()` ([Trac #64651], [PR #12197]).
+  Scripts, event handlers, `javascript:`/`data:` URLs, `<foreignObject>`, and
+  disallowed elements are stripped
+- Integration test suite running the sanitizer against real `wp_kses()` and
+  `WP_HTML_Processor`, using WordPress core's own test expectations verbatim,
+  so any drift from upstream fails loudly
+
+### Changed
+
+- Test suite migrated from Brain Monkey to a real WordPress install via
+  `alvarodelera/pest-wp-plugin` (SQLite, no database server). Requires Pest 5
+  and **PHP 8.4 for development**; the package itself still supports PHP 8.2+
+- Resolver tests now assert real return values rather than mocked call
+  expectations
+
+### Known issues
+
+- Two sanitizer conformance cases are skipped on WordPress 7.0.x:
+  `WP_HTML_Processor::serialize_token()` splits `xmlns:xlink` into two
+  attributes, losing the colon, so the namespace declaration is dropped from
+  the root `<svg>` before `wp_kses()` runs. The allow-list and vendored port
+  are correct; the loss happens upstream in the parser
+- `is_child_theme()` is constant-backed, so `ChildTheme::exists()` can only be
+  exercised against whichever theme the test environment has active
+
+[#4]: https://github.com/themehybrid/hybrid-assets/issues/4
+[Trac #64651]: https://core.trac.wordpress.org/ticket/64651
+[PR #12197]: https://github.com/WordPress/wordpress-develop/pull/12197
+
 ## [1.0.0-alpha.5] - 2026-08-01
 
 Large internal restructure. The public method names are mostly unchanged, but
