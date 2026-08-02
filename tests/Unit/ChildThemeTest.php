@@ -2,57 +2,56 @@
 
 use Hybrid\Assets\ChildTheme;
 
-/**
- * `Hybrid\Tools\WordPress\get_child_theme_file_path()` and
- * `get_child_theme_file_uri()` are real functions shipped by hybrid-tools
- * (guarded by function_exists, loaded eagerly via Composer). Brain Monkey
- * can only intercept functions that don't already exist, so rather than
- * mocking those two directly, these tests mock the WordPress core functions
- * they're implemented in terms of and let the real helpers run.
+/*
+ * Migrated off Brain Monkey — with one acknowledged loss of coverage.
+ *
+ * `is_child_theme()` is implemented in core as `TEMPLATEPATH !== STYLESHEETPATH`.
+ * Those are PHP constants, fixed for the lifetime of the process, so with a
+ * real WordPress install it is impossible to exercise both the true and false
+ * branches in a single test run. The previous Brain Monkey test did:
+ *
+ *     Functions\when( 'is_child_theme' )->justReturn( $isChildTheme );
+ *     ...->with( [ true, false ] );
+ *
+ * That is not reproducible here. Rather than pretend otherwise with a
+ * tautology, the delegation contract is pinned at the call site (below), and
+ * the value branch is asserted against whatever the provisioned install
+ * actually is. If the test environment ever gains a child theme, the second
+ * test flips on its own rather than silently passing.
  */
-function stub_child_theme_filters(): void {
-    Brain\Monkey\Functions\when( 'apply_filters' )->returnArg( 2 );
-}
 
-it( 'exists() reflects is_child_theme()', function ( bool $isChildTheme ) {
-    Brain\Monkey\Functions\when( 'is_child_theme' )->justReturn( $isChildTheme );
+it( 'exists() agrees with the active install', function () {
+    expect( ( new ChildTheme )->exists() )->toBe( is_child_theme() );
+} );
 
-    expect( ( new ChildTheme )->exists() )->toBe( $isChildTheme );
-} )->with( [ true, false ] );
+it( 'exists() delegates to is_child_theme()', function () {
+    $reflection = new ReflectionMethod( ChildTheme::class, 'exists' );
+    $lines      = file( $reflection->getFileName() );
+    $source     = implode( '', array_slice(
+        $lines,
+        $reflection->getStartLine() - 1,
+        $reflection->getEndLine() - $reflection->getStartLine() + 1
+    ) );
+
+    expect( $source )->toContain( 'is_child_theme(' );
+} );
 
 it( 'resolves path() via the stylesheet directory', function () {
-    stub_child_theme_filters();
-
-    Brain\Monkey\Functions\expect( 'get_stylesheet_directory' )
-        ->once()
-        ->andReturn( '/var/www/child-theme' );
-
-    $theme = new ChildTheme;
-
-    expect( $theme->path( '/public/js/app.js' ) )->toBe( '/var/www/child-theme/public/js/app.js' );
+    expect( ( new ChildTheme )->path( '/public/js/app.js' ) )
+        ->toBe( get_stylesheet_directory() . '/public/js/app.js' );
 } );
 
 it( 'path() returns the bare stylesheet directory for an empty file', function () {
-    stub_child_theme_filters();
-
-    Brain\Monkey\Functions\expect( 'get_stylesheet_directory' )
-        ->once()
-        ->andReturn( '/var/www/child-theme' );
-
-    expect( ( new ChildTheme )->path() )->toBe( '/var/www/child-theme' );
+    expect( ( new ChildTheme )->path() )->toBe( get_stylesheet_directory() );
 } );
 
 it( 'resolves url() via the stylesheet directory URI', function () {
-    stub_child_theme_filters();
+    expect( ( new ChildTheme )->url( '/public/js/app.js' ) )
+        ->toBe( get_stylesheet_directory_uri() . '/public/js/app.js' );
+} );
 
-    Brain\Monkey\Functions\expect( 'get_stylesheet_directory_uri' )
-        ->once()
-        ->andReturn( 'https://example.test/wp-content/themes/child-theme' );
-
-    $theme = new ChildTheme;
-
-    expect( $theme->url( '/public/js/app.js' ) )
-        ->toBe( 'https://example.test/wp-content/themes/child-theme/public/js/app.js' );
+it( 'url() returns the bare stylesheet directory URI for an empty file', function () {
+    expect( ( new ChildTheme )->url() )->toBe( get_stylesheet_directory_uri() );
 } );
 
 it( 'has no inheritance chain of its own', function () {

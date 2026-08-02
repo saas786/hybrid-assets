@@ -5,34 +5,24 @@
 | Test Case
 |--------------------------------------------------------------------------
 |
-| Brain Monkey needs to be booted before each test (so WordPress function
-| stubs/mocks are available) and torn down after each test (so mocks/
-| expectations from one test never leak into the next).
+| The suite runs against a real WordPress install, provisioned by PestWP
+| (SQLite, no MySQL). There is no function mocking: WordPress functions
+| called by the resolvers are the real ones.
+|
+| Consequence worth knowing: assertions are about RETURN VALUES, not about
+| which WordPress function was called. Under the previous Brain Monkey setup
+| a test could assert `get_parent_theme_file_path()` was called once with an
+| exact argument. That is no longer expressible. Where that contract still
+| matters, it is asserted structurally instead (see ParentThemeTest).
 |
 */
 
+use PestWP\Database\TransactionManager;
+
 uses()
-    ->beforeEach( function () {
-        \Brain\Monkey\setUp();
-
-        // normalizeDirectory() relies on this in practically every test that
-        // touches an AssetsResolver — stub it once, globally, with the real
-        // WordPress core behavior rather than mocking it per test.
-        \Brain\Monkey\Functions\when( 'wp_normalize_path' )->alias( function ( string $path ): string {
-            $path = str_replace( '\\', '/', $path );
-            $path = preg_replace( '|(?<=.)/+|', '/', $path );
-
-            if ( ':' === substr( $path, 1, 1 ) ) {
-                $path = ucfirst( $path );
-            }
-
-            return $path;
-        } );
-    } )
-    ->afterEach( function () {
-        \Brain\Monkey\tearDown();
-    } )
-    ->in( 'Unit' );
+    ->beforeEach( fn() => TransactionManager::beginTransaction() )
+    ->afterEach( fn() => TransactionManager::rollback() )
+    ->in( 'Integration' );
 
 /*
 |--------------------------------------------------------------------------
@@ -41,8 +31,7 @@ uses()
 */
 
 /**
- * Create a temporary fixture directory (mirroring a theme/plugin root) that
- * is deleted automatically at the end of the test process.
+ * Path to a temporary fixture directory (mirroring a theme/plugin root).
  */
 function assets_fixture_path( string $path = '' ): string {
     $base = dirname( __DIR__ ) . '/tests/Fixtures';
@@ -51,24 +40,17 @@ function assets_fixture_path( string $path = '' ): string {
 }
 
 /**
- * Recursively delete a directory. Used to clean up any fixture files a test
- * writes into a temp folder at runtime.
+ * Recursively delete a directory created during a test.
  */
 function delete_directory( string $dir ): void {
     if ( ! is_dir( $dir ) ) {
         return;
     }
 
-    $items = scandir( $dir );
-
-    foreach ( $items as $item ) {
-        if ( '.' === $item || '..' === $item ) {
-            continue;
-        }
-
+    foreach ( array_diff( scandir( $dir ), [ '.', '..' ] ) as $item ) {
         $path = $dir . '/' . $item;
 
-        is_dir( $path ) ? delete_directory( $path ) : unlink( $path );
+        is_dir( $path ) && ! is_link( $path ) ? delete_directory( $path ) : unlink( $path );
     }
 
     rmdir( $dir );

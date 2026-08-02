@@ -3,3 +3,6 @@ composer.lock
 /.idea
 /.phpunit.cache
 /.vscode
+
+# WordPress core checkout used by the sanitizer conformance tests.
+/.pest/
